@@ -130,7 +130,7 @@ async def get_latest_release_from_github() -> Optional[dict]:
         # Find the .exe asset and .sha256 asset
         download_url = ""
         file_size = 0
-        sha256_url = ""
+        sha256_api_url = ""
 
         for asset in data.get("assets", []):
             name = asset.get("name", "")
@@ -138,7 +138,8 @@ async def get_latest_release_from_github() -> Optional[dict]:
                 download_url = asset.get("browser_download_url", "")
                 file_size = asset.get("size", 0)
             elif name.endswith(".sha256"):
-                sha256_url = asset.get("browser_download_url", "")
+                # Use API URL (not browser_download_url) so auth headers work for private repos
+                sha256_api_url = asset.get("url", "")
 
         if not download_url:
             logger.warning("No .exe asset found in release %s", tag)
@@ -146,10 +147,13 @@ async def get_latest_release_from_github() -> Optional[dict]:
 
         # Fetch SHA-256 hash if the .sha256 file exists
         sha256 = ""
-        if sha256_url:
+        if sha256_api_url:
             try:
-                async with httpx.AsyncClient(timeout=10) as client:
-                    hash_resp = await client.get(sha256_url)
+                # Use API URL with auth + Accept: application/octet-stream (works for private repos)
+                sha_headers = _github_headers()
+                sha_headers["Accept"] = "application/octet-stream"
+                async with httpx.AsyncClient(timeout=10, follow_redirects=True) as client:
+                    hash_resp = await client.get(sha256_api_url, headers=sha_headers)
                     if hash_resp.status_code == 200:
                         # .sha256 file format: "hexhash  filename" or just "hexhash"
                         sha256_text = hash_resp.text.strip()

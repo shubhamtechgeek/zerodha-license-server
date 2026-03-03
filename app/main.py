@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine
 from app.models import Base
-from app.routes import admin, license, webhook
+from app.routes import admin, download_page, license, updates, webhook
 
 logging.basicConfig(
     level=logging.INFO,
@@ -50,6 +50,8 @@ app.add_middleware(
 app.include_router(license.router)
 app.include_router(webhook.router)
 app.include_router(admin.router)
+app.include_router(updates.router)
+app.include_router(download_page.router)
 
 
 @app.get("/")

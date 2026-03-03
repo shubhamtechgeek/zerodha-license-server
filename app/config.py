@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     port: int = 8000
     cors_origins: List[str] = ["http://localhost:5000", "http://127.0.0.1:5000"]
 
+    # GitHub Releases — used for update distribution
+    # Set these in your Render environment variables
+    github_token: str = ""          # Personal Access Token with repo scope
+    github_owner: str = "shubhamtechgeek"
+    github_repo: str = "zerodha-license-server"  # or a dedicated releases repo
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

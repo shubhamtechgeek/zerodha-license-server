@@ -129,6 +129,8 @@ async def get_latest_release_from_github() -> Optional[dict]:
 
         # Find the .exe asset and .sha256 asset
         download_url = ""
+        api_download_url = ""
+        asset_name = ""
         file_size = 0
         sha256_api_url = ""
 
@@ -136,6 +138,9 @@ async def get_latest_release_from_github() -> Optional[dict]:
             name = asset.get("name", "")
             if name.endswith(".exe") and "Setup" in name:
                 download_url = asset.get("browser_download_url", "")
+                # API URL works for private repos with auth + Accept: application/octet-stream
+                api_download_url = asset.get("url", "")
+                asset_name = name
                 file_size = asset.get("size", 0)
             elif name.endswith(".sha256"):
                 # Use API URL (not browser_download_url) so auth headers work for private repos
@@ -173,6 +178,8 @@ async def get_latest_release_from_github() -> Optional[dict]:
             "release_date": release_date,
             "release_notes": body_meta["release_notes"],
             "download_url": download_url,
+            "api_download_url": api_download_url,
+            "asset_name": asset_name,
             "file_size": file_size,
             "sha256": sha256,
             "mandatory": body_meta["mandatory"],
@@ -239,8 +246,10 @@ async def check_update_available(current_version: str) -> dict:
     }
 
     if update_available:
-        # Direct GitHub CDN download URL — client downloads from here
-        result["download_url"] = release["download_url"]
+        # Proxy URL — client downloads through the license server,
+        # which authenticates with GitHub on behalf of the client.
+        # This works for both public and private repos.
+        result["download_url"] = "/api/updates/download"
         result["file_size"] = release.get("file_size", 0)
         result["sha256"] = release.get("sha256", "")
 
@@ -254,3 +263,22 @@ async def get_latest_download_info() -> Optional[dict]:
     Returns dict with version, download_url, file_size, release_notes, html_url.
     """
     return await get_latest_release_from_github()
+
+
+async def get_api_download_url() -> Optional[dict]:
+    """
+    Get the GitHub API asset URL for the latest installer.
+
+    Returns dict with api_download_url, asset_name, file_size, version.
+    Used by the /api/updates/download proxy endpoint to stream the
+    installer to the client using authenticated GitHub API requests.
+    """
+    release = await get_latest_release_from_github()
+    if not release or not release.get("api_download_url"):
+        return None
+    return {
+        "api_download_url": release["api_download_url"],
+        "asset_name": release.get("asset_name", ""),
+        "file_size": release.get("file_size", 0),
+        "version": release["version"],
+    }
